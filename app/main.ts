@@ -92,8 +92,12 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_wc, perm, callback) => {
     callback(perm === "geolocation" || perm === "media" || perm === "notifications");
   });
-  await ensureTunneld();
-  spawnBackend();
+  if (!DEV) {
+    // Packaged app: launch tunneld + backend ourselves.
+    await ensureTunneld();
+    spawnBackend();
+  }
+  // Dev: dev.sh already owns tunneld + backend. Skip to avoid :8765 collision.
   await createWindow();
 });
 
