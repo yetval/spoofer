@@ -316,6 +316,11 @@ label > span:not(.muted):last-child {
 }
 .leaflet-control-zoom a:hover { background: var(--panel3) !important; }
 
+#lock.active {
+  background: rgba(52,208,88,0.15); color: var(--ok);
+  border-color: rgba(52,208,88,0.4);
+}
+
 @keyframes livepulse {
   0%, 100% { box-shadow: 0 0 0 4px rgba(47,136,255,0.4), 0 0 0 8px rgba(47,136,255,0.15); }
   50%      { box-shadow: 0 0 0 10px rgba(47,136,255,0.2), 0 0 0 18px rgba(47,136,255,0); }

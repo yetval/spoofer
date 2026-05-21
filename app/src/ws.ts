@@ -3,6 +3,7 @@ export type Msg =
   | { type: "state"; lat: number; lon: number }
   | { type: "progress"; lat: number; lon: number; mode: string;
       doneM: number; totalM: number; speedMps: number; etaS: number; bearingDeg: number }
+  | { type: "lock"; on: boolean }
   | { type: "pong" }
   | { type: "error"; message: string };
 

@@ -88,6 +88,8 @@ async function boot(): Promise<void> {
       hudSpeed.textContent = m.speedMps > 0.3 ? fmtSpeed(m.speedMps) : "—";
       hudEta.textContent = m.mode === "drive" && m.etaS > 0 ? fmtTime(m.etaS) : "—";
       controls.applyProgress(m);
+    } else if (m.type === "lock") {
+      controls.applyLockState(m.on);
     } else if (m.type === "error") {
       console.error("[spoofer backend]", m.message);
     }

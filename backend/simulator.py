@@ -52,10 +52,13 @@ class LocationSimulator:
         self.session = session
         self._task: Optional[asyncio.Task] = None
         self._current = LatLon(0.0, 0.0)
+        self._intended: Optional[LatLon] = None  # last-asked-for spot for keepalive
+        self._lock_enabled = False
         self._joystick_vec = (0.0, 0.0)
         self._joystick_speed = 0.0
         self.progress = Progress()
         self._lock = asyncio.Lock()
+        self._watchdog: Optional[asyncio.Task] = None
 
     @property
     def current(self) -> LatLon:
@@ -74,7 +77,52 @@ class LocationSimulator:
 
     async def reset(self) -> None:
         await self.stop()
+        await self.stop_lock()
+        self._intended = None
         await self.session.sim.clear()
+
+    def lock_enabled(self) -> bool:
+        return self._lock_enabled
+
+    async def start_lock(self) -> None:
+        self._lock_enabled = True
+        if self._watchdog and not self._watchdog.done():
+            return
+        self._watchdog = asyncio.create_task(self._lock_loop())
+
+    async def stop_lock(self) -> None:
+        self._lock_enabled = False
+        if self._watchdog and not self._watchdog.done():
+            self._watchdog.cancel()
+            try:
+                await self._watchdog
+            except asyncio.CancelledError:
+                pass
+        self._watchdog = None
+
+    async def _lock_loop(self) -> None:
+        """Every 4s, re-push intended location if no active mode + lock on.
+        Auto-recovers from dead DVT session."""
+        while self._lock_enabled:
+            await asyncio.sleep(4.0)
+            if not self._intended:
+                continue
+            # Skip if walk/drive/joystick already pushing.
+            if self._task and not self._task.done():
+                continue
+            try:
+                await self.session.sim.set(self._intended.lat, self._intended.lon)
+                self._current = self._intended
+            except Exception as exc:
+                log.warning("lock heartbeat failed, reconnecting: %s", exc)
+                try:
+                    await self.session.close()
+                    await self.session.connect()
+                    await self.session.sim.set(self._intended.lat, self._intended.lon)
+                    self._current = self._intended
+                    log.info("lock recovered")
+                except Exception as inner:
+                    log.error("lock recovery failed: %s", inner)
 
     async def teleport(self, lat: float, lon: float) -> None:
         await self.stop()
@@ -107,6 +155,7 @@ class LocationSimulator:
 
     async def _push(self, lat: float, lon: float) -> None:
         self._current = LatLon(lat, lon)
+        self._intended = self._current
         await self.session.sim.set(lat, lon)
 
     async def _linear_loop(self, dst: LatLon, speed_mps: float, mode: str) -> None:

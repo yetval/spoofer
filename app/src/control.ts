@@ -31,6 +31,7 @@ export class Controls {
   private joystick: Joystick | null = null;
   private currentSpoofed: LatLon | null = null;
   private realLocation: LatLon | null = null;
+  private lockOn = false;
 
   constructor(private map: MapView, private backend: Backend) {}
 
@@ -90,6 +91,10 @@ export class Controls {
 
     document.getElementById("reset")?.addEventListener("click", () => { this.send({ cmd: "reset" }); flash("Reset"); });
     document.getElementById("reconnect")?.addEventListener("click", () => this.reconnect());
+    document.getElementById("lock")?.addEventListener("click", () => {
+      this.lockOn = !this.lockOn;
+      this.send({ cmd: "lock", on: this.lockOn });
+    });
 
     // Joystick
     document.getElementById("j-stop")?.addEventListener("click", () => { this.send({ cmd: "stop" }); flash("Joystick stopped"); });
@@ -152,6 +157,15 @@ export class Controls {
 
   setCurrentLocation(p: LatLon): void { this.currentSpoofed = p; }
   setRealLocation(p: LatLon): void { this.realLocation = p; }
+
+  applyLockState(on: boolean): void {
+    this.lockOn = on;
+    const b = document.getElementById("lock");
+    if (!b) return;
+    b.textContent = on ? "🔒 Lock: on" : "🔒 Lock: off";
+    b.classList.toggle("active", on);
+    flash(on ? "Lock on — pinned + auto-recover" : "Lock off");
+  }
 
   private wirePicker(mode: "walk" | "drive"): void {
     const prefix = mode[0];

@@ -147,6 +147,14 @@ async def _dispatch(s: LocationSimulator, msg: dict, socket: WebSocket) -> None:
             await s.stop()
         elif cmd == "reset":
             await s.reset()
+        elif cmd == "lock":
+            on = bool(msg.get("on", True))
+            if on:
+                await s.start_lock()
+            else:
+                await s.stop_lock()
+            await socket.send_json({"type": "lock", "on": s.lock_enabled()})
+            return
         elif cmd == "ping":
             await socket.send_json({"type": "pong"})
             return
