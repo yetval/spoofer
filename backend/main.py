@@ -153,8 +153,27 @@ async def _progress_pump(s: LocationSimulator, socket: WebSocket) -> None:
         pass
 
 
-async def _dispatch(s: LocationSimulator, msg: dict, socket: WebSocket) -> None:
+DEVICE_CMDS = {"teleport", "walk", "drive", "joystick_start", "joystick_vec", "stop", "reset", "lock"}
+
+
+async def _ensure_alive() -> bool:
+    """Reconnect if session died. Returns True if alive after."""
+    if session.is_alive():
+        return True
+    try:
+        await session.connect()
+        return True
+    except Exception as exc:
+        log.warning("auto-reconnect failed: %s", exc)
+        return False
+
+
+async def _dispatch(s: LocationSimulator, msg: dict, socket: WebSocket, _retry: bool = False) -> None:
     cmd = msg.get("cmd")
+    if cmd in DEVICE_CMDS:
+        if not await _ensure_alive():
+            await socket.send_json({"type": "error", "message": "Device unreachable. Check USB/Trust/tunneld."})
+            return
     try:
         if cmd == "teleport":
             await s.teleport(float(msg["lat"]), float(msg["lon"]))
@@ -193,6 +212,13 @@ async def _dispatch(s: LocationSimulator, msg: dict, socket: WebSocket) -> None:
             "lat": s.current.lat,
             "lon": s.current.lon,
         })
+    except RuntimeError as exc:
+        if "Not connected" in str(exc) and not _retry:
+            log.warning("session died mid-cmd, reconnecting + retry")
+            await session.close()
+            if await _ensure_alive():
+                return await _dispatch(s, msg, socket, _retry=True)
+        await socket.send_json({"type": "error", "message": str(exc)})
     except Exception as exc:
         log.exception("dispatch failed")
         await socket.send_json({"type": "error", "message": str(exc)})

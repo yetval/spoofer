@@ -93,6 +93,9 @@ class DeviceSession:
     def udid(self) -> Optional[str]:
         return getattr(self._rsd, "udid", None) if self._rsd else None
 
+    def is_alive(self) -> bool:
+        return self._sim is not None
+
     @property
     def sim(self) -> LocationSimulation:
         if self._sim is None:
