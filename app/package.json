@@ -1,0 +1,44 @@
+{
+  "name": "spoofer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist-main/main.js",
+  "scripts": {
+    "dev:vite": "vite",
+    "build:vite": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:vite && npm run build:main",
+    "start": "electron .",
+    "dev": "concurrently -k \"npm:dev:vite\" \"wait-on http://127.0.0.1:5173 && npm run build:main && electron .\"",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "nipplejs": "^0.10.2"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.spoofer.app",
+    "productName": "Spoofer",
+    "files": [
+      "dist-main/**/*",
+      "dist-renderer/**/*",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "../backend", "to": "backend" },
+      { "from": "../scripts", "to": "scripts" }
+    ],
+    "mac": { "category": "public.app-category.developer-tools" }
+  }
+}
