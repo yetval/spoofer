@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from device import DeviceSession
+from device import DeviceSession, list_devices
 from simulator import LatLon, LocationSimulator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -52,16 +52,43 @@ async def health() -> dict:
 
 
 @app.post("/reconnect")
-async def reconnect() -> dict:
+async def reconnect(udid: str | None = None) -> dict:
     global sim
     await session.close()
     sim = None
     try:
-        info = await session.connect()
+        info = await session.connect(udid=udid)
     except Exception as exc:
         log.warning("reconnect failed: %s", exc)
         raise HTTPException(503, f"Reconnect failed: {exc}")
     return {"udid": info.udid, "name": info.name, "iosVersion": info.ios_version}
+
+
+@app.post("/select-device")
+async def select_device(udid: str) -> dict:
+    global sim
+    await session.close()
+    sim = None
+    try:
+        info = await session.connect(udid=udid)
+    except Exception as exc:
+        raise HTTPException(503, f"Select failed: {exc}")
+    return {"udid": info.udid, "name": info.name, "iosVersion": info.ios_version}
+
+
+@app.get("/devices/all")
+async def devices_all() -> dict:
+    try:
+        items = await list_devices()
+    except Exception as exc:
+        raise HTTPException(503, str(exc))
+    return {
+        "devices": [
+            {"udid": d.udid, "name": d.name, "productType": d.product_type, "iosVersion": d.ios_version}
+            for d in items
+        ],
+        "active": session.udid(),
+    }
 
 
 @app.get("/devices")

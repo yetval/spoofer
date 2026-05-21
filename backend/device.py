@@ -9,6 +9,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from typing import Optional
+
 from pymobiledevice3.exceptions import NoDeviceConnectedError
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.services.dvt.instruments.location_simulation import (
@@ -28,6 +30,18 @@ class DeviceInfo:
     ios_version: str
 
 
+async def list_devices() -> list[DeviceInfo]:
+    out = []
+    for d in await get_tunneld_devices():
+        out.append(DeviceInfo(
+            udid=getattr(d, "udid", "unknown"),
+            name=getattr(d, "name", None) or getattr(d, "udid", "iPhone"),
+            product_type=getattr(d, "product_type", "iPhone"),
+            ios_version=getattr(d, "product_version", "unknown"),
+        ))
+    return out
+
+
 class DeviceSession:
     """One open DVT channel to one iPhone."""
 
@@ -37,9 +51,9 @@ class DeviceSession:
         self._sim: Optional[LocationSimulation] = None
         self._lock = asyncio.Lock()
 
-    async def connect(self) -> DeviceInfo:
+    async def connect(self, udid: Optional[str] = None) -> DeviceInfo:
         async with self._lock:
-            if self._sim is not None:
+            if self._sim is not None and (udid is None or getattr(self._rsd, "udid", None) == udid):
                 return self._info()
 
             devices = await get_tunneld_devices()
@@ -47,7 +61,13 @@ class DeviceSession:
                 raise NoDeviceConnectedError(
                     "No tunneld device. Run `sudo pymobiledevice3 remote tunneld`."
                 )
-            self._rsd = devices[0]
+            if udid:
+                chosen = next((d for d in devices if getattr(d, "udid", None) == udid), None)
+                if not chosen:
+                    raise NoDeviceConnectedError(f"UDID {udid} not in tunneld list")
+            else:
+                chosen = devices[0]
+            self._rsd = chosen
 
             try:
                 await auto_mount(self._rsd)
@@ -69,6 +89,9 @@ class DeviceSession:
             product_type=getattr(r, "product_type", "iPhone"),
             ios_version=getattr(r, "product_version", "unknown"),
         )
+
+    def udid(self) -> Optional[str]:
+        return getattr(self._rsd, "udid", None) if self._rsd else None
 
     @property
     def sim(self) -> LocationSimulation:

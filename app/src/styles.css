@@ -51,6 +51,23 @@ body {
   color: var(--ok); border-color: rgba(52,208,88,0.3);
   background: rgba(52,208,88,0.08);
 }
+#device-picker { position: relative; }
+#device-list {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 9999;
+  list-style: none; margin: 0; padding: 4px; min-width: 240px;
+  background: rgba(20,20,26,0.98); border: 1px solid var(--border); border-radius: 10px;
+  backdrop-filter: blur(14px); box-shadow: var(--shadow);
+}
+#device-list.hidden { display: none; }
+#device-list li {
+  padding: 8px 12px; cursor: pointer; border-radius: 6px;
+  font-size: 12px; display: flex; flex-direction: column; gap: 2px;
+}
+#device-list li:hover { background: var(--accent); color: #fff; }
+#device-list li.active { background: rgba(52,208,88,0.15); color: var(--ok); }
+#device-list li .small { font-size: 10px; opacity: 0.7; font-family: ui-monospace, Menlo, monospace; }
+#device-list li.empty { color: var(--muted); cursor: default; text-align: center; }
+#device-list li.empty:hover { background: transparent; color: var(--muted); }
 .dot {
   padding: 3px 9px; border-radius: 999px; background: #2a2a34; font-size: 10px;
   font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted);

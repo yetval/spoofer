@@ -54,11 +54,14 @@ async function boot(): Promise<void> {
     wsEl.classList.toggle("down", !up);
   });
 
+  const deviceList = document.getElementById("device-list") as HTMLUListElement;
+
   const refreshDevice = () => {
     fetch(`http://127.0.0.1:${port}/devices`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => {
-        deviceEl.textContent = `${d.name?.startsWith("usbmux") ? "iPhone" : d.name} · iOS ${d.iosVersion}`;
+        const name = d.name?.startsWith("usbmux") ? "iPhone" : d.name;
+        deviceEl.textContent = `${name} · iOS ${d.iosVersion}`;
         deviceEl.classList.add("connected");
       })
       .catch(() => {
@@ -66,6 +69,56 @@ async function boot(): Promise<void> {
         deviceEl.classList.remove("connected");
       });
   };
+
+  const refreshDeviceList = async () => {
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/devices/all`);
+      if (!r.ok) throw new Error(String(r.status));
+      const j = await r.json();
+      deviceList.innerHTML = "";
+      if (!j.devices?.length) {
+        deviceList.innerHTML = '<li class="empty">No devices via tunneld</li>';
+        return;
+      }
+      for (const d of j.devices) {
+        const li = document.createElement("li");
+        const name = d.name?.startsWith("usbmux") ? "iPhone" : d.name;
+        const active = d.udid === j.active;
+        if (active) li.classList.add("active");
+        li.innerHTML = `<span>${active ? "● " : ""}${name} · iOS ${d.iosVersion}</span><span class="small">${d.udid}</span>`;
+        li.addEventListener("click", async () => {
+          deviceList.classList.add("hidden");
+          if (active) return;
+          deviceEl.textContent = "Switching…";
+          try {
+            const sr = await fetch(`http://127.0.0.1:${port}/select-device?udid=${encodeURIComponent(d.udid)}`, { method: "POST" });
+            if (!sr.ok) throw new Error(await sr.text());
+            refreshDevice();
+          } catch (e) {
+            deviceEl.textContent = `Switch failed`;
+            console.error(e);
+          }
+        });
+        deviceList.appendChild(li);
+      }
+    } catch (e) {
+      deviceList.innerHTML = '<li class="empty">Cannot reach tunneld</li>';
+    }
+  };
+
+  deviceEl.addEventListener("click", async () => {
+    if (deviceList.classList.contains("hidden")) {
+      await refreshDeviceList();
+      deviceList.classList.remove("hidden");
+    } else {
+      deviceList.classList.add("hidden");
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (!(e.target as Element).closest?.("#device-picker")) {
+      deviceList.classList.add("hidden");
+    }
+  });
 
   const controls = new Controls(map, backend);
 
