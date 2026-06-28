@@ -59,7 +59,8 @@ class DeviceSession:
             devices = await get_tunneld_devices()
             if not devices:
                 raise NoDeviceConnectedError(
-                    "No tunneld device. Run `sudo pymobiledevice3 remote tunneld`."
+                    "No tunneld device. Start tunneld as admin/root "
+                    "(`pymobiledevice3 remote tunneld`) — see README."
                 )
             if udid:
                 chosen = next((d for d in devices if getattr(d, "udid", None) == udid), None)

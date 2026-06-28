@@ -39,6 +39,8 @@
       { "from": "../backend", "to": "backend" },
       { "from": "../scripts", "to": "scripts" }
     ],
-    "mac": { "category": "public.app-category.developer-tools" }
+    "mac": { "category": "public.app-category.developer-tools" },
+    "win": { "target": ["nsis"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }
