@@ -17,14 +17,28 @@ if ($stale) {
 }
 
 # 1. backend venv (needed for pymobiledevice3 binary path)
+# Prefer Python 3.12: the `lzfse` dependency only ships prebuilt Windows wheels up to CPython 3.12,
+# so 3.13+ would try to compile it and need a C++ toolchain. Fall back to default `python`.
 if (-not (Test-Path $venv)) {
   Write-Host "Creating venv..."
-  python -m venv $venv
-  & (Join-Path $venv "Scripts\pip.exe") install -r (Join-Path $root "backend\requirements.txt")
+  $created = $false
+  if (Get-Command py -ErrorAction SilentlyContinue) {
+    foreach ($v in @("3.12", "3.11")) {
+      & py "-$v" -m venv $venv 2>$null
+      if ($LASTEXITCODE -eq 0) { Write-Host "  using Python $v"; $created = $true; break }
+    }
+  }
+  if (-not $created) {
+    Write-Host "  Python 3.12 not found via the py launcher; using default python (3.13+ may need C++ Build Tools)."
+    python -m venv $venv
+  }
+  # Call pip as a module — conda-base venvs omit the pip.exe wrapper.
+  & (Join-Path $venv "Scripts\python.exe") -m pip install -r (Join-Path $root "backend\requirements.txt")
 }
-$pmd = Join-Path $venv "Scripts\pymobiledevice3.exe"
-if (-not (Test-Path $pmd)) {
-  Write-Error "pymobiledevice3 missing in venv. Reinstall: $venv\Scripts\pip.exe install -r $root\backend\requirements.txt"
+$venvPy = Join-Path $venv "Scripts\python.exe"
+& $venvPy -c "import pymobiledevice3" 2>$null
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "pymobiledevice3 missing in venv. Reinstall: $venvPy -m pip install -r $root\backend\requirements.txt"
   exit 1
 }
 

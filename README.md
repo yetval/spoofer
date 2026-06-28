@@ -29,10 +29,17 @@ cd ../app          && npm install
 **Windows** (PowerShell)
 
 ```powershell
-winget install Python.Python.3.13 OpenJS.NodeJS
-cd spoofer\backend; python -m venv .venv; .\.venv\Scripts\pip install -r requirements.txt
+winget install Python.Python.3.12 OpenJS.NodeJS
+cd spoofer\backend; py -3.12 -m venv .venv; .\.venv\Scripts\python -m pip install -r requirements.txt
 cd ..\app;          npm install
 ```
+
+> **Use Python 3.12, not 3.13+.** `pymobiledevice3` pulls in `lzfse`, a C-extension whose prebuilt
+> Windows wheels currently stop at CPython 3.12. On 3.13+ pip falls back to compiling it from source
+> and fails with *"Microsoft Visual C++ 14.0 or greater is required."* Python 3.12 installs the wheel
+> directly — no compiler needed. (If you're stuck on 3.13+, install the
+> [Build Tools for Visual Studio](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the
+> "Desktop development with C++" workload instead.)
 
 > **Windows extra:** `tunneld` needs Administrator rights (you'll get a UAC prompt). For **iOS 17.0–17.3.1** you must also install the **Wintun** driver — download `wintun.dll` from [wintun.net](https://www.wintun.net) and drop it next to the venv's `pymobiledevice3.exe` (or anywhere on `PATH`). iOS **17.4+** needs no extra driver. See the [pymobiledevice3 iOS 17 tunnel guide](https://github.com/doronz88/pymobiledevice3/blob/master/docs/guides/ios17-tunnels.md).
 
@@ -89,7 +96,9 @@ Big red **Reset to real** button in the top-right. Also clears automatically if 
 | `No tunneld device` | Trust dialog dismissed on phone — unlock and replug |
 | `pymobiledevice3 not found` | Use the venv binary (`backend/.venv/Scripts/pymobiledevice3.exe` on Windows, `backend/.venv/bin/pymobiledevice3` on macOS) or reinstall requirements |
 | Wintun / TUN device error (Windows) | Install the Wintun driver (`wintun.dll`) — required for iOS 17.0–17.3.1, see setup note above |
-| `python` not found (Windows) | Install Python and re-open the shell so it's on `PATH` (`winget install Python.Python.3.13`) |
+| `python` not found (Windows) | Install Python and re-open the shell so it's on `PATH` (`winget install Python.Python.3.12`) |
+| `Failed building wheel for lzfse` / `Visual C++ 14.0 required` (Windows) | You're on Python 3.13+; no prebuilt `lzfse` wheel. Recreate the venv with 3.12: `py -3.12 -m venv .venv` (or install the C++ Build Tools) |
+| `pip` not recognized in venv (Windows) | Conda-base venvs omit the `pip.exe` wrapper — call it as a module: `.\.venv\Scripts\python -m pip ...` |
 | `InvalidServiceError` | DDI not mounted: `pymobiledevice3 mounter auto-mount` |
 | Map blank | Check renderer console for tile errors. Confirm internet reachable. |
 | Blue dot doesn't move on phone | Open Apple Maps once after teleport — CoreLocation publishes on first read |
