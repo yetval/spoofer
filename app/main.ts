@@ -4,6 +4,7 @@ import { existsSync } from "fs";
 import { join, resolve } from "path";
 
 const DEV = !app.isPackaged;
+const isWin = process.platform === "win32";
 const BACKEND_PORT = 8765;
 const TUNNELD_URL = "http://127.0.0.1:49151";
 
@@ -32,12 +33,26 @@ async function tunnelUp(): Promise<boolean> {
 
 async function ensureTunneld(): Promise<"already" | "started" | "denied"> {
   if (await tunnelUp()) return "already";
-  const script = join(scriptsDir, "start-tunneld.sh");
   return new Promise((resolveP) => {
-    const osa = `do shell script "bash ${script.replace(/"/g, '\\"')}" with administrator privileges`;
-    tunneldProc = execFile("osascript", ["-e", osa], (err) => {
-      if (err) resolveP("denied");
-    });
+    if (isWin) {
+      // Elevate via UAC: Start-Process the PowerShell launcher with -Verb RunAs.
+      const script = join(scriptsDir, "start-tunneld.ps1");
+      const inner = `Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','${script}'`;
+      tunneldProc = execFile(
+        "powershell",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", inner],
+        (err) => {
+          if (err) resolveP("denied");
+        }
+      );
+    } else {
+      // macOS: osascript prompts for admin and runs the bash launcher.
+      const script = join(scriptsDir, "start-tunneld.sh");
+      const osa = `do shell script "bash ${script.replace(/"/g, '\\"')}" with administrator privileges`;
+      tunneldProc = execFile("osascript", ["-e", osa], (err) => {
+        if (err) resolveP("denied");
+      });
+    }
     const t0 = Date.now();
     const poll = setInterval(async () => {
       if (await tunnelUp()) {
@@ -53,9 +68,10 @@ async function ensureTunneld(): Promise<"already" | "started" | "denied"> {
 
 function spawnBackend(): void {
   if (backendProc) return;
-  const py = existsSync(join(backendDir, ".venv/bin/python"))
-    ? join(backendDir, ".venv/bin/python")
-    : "python3";
+  const venvPy = isWin
+    ? join(backendDir, ".venv", "Scripts", "python.exe")
+    : join(backendDir, ".venv", "bin", "python");
+  const py = existsSync(venvPy) ? venvPy : isWin ? "python" : "python3";
   backendProc = spawn(
     py,
     ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", String(BACKEND_PORT)],
