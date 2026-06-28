@@ -99,6 +99,8 @@ Big red **Reset to real** button in the top-right. Also clears automatically if 
 | `python` not found (Windows) | Install Python and re-open the shell so it's on `PATH` (`winget install Python.Python.3.12`) |
 | `Failed building wheel for lzfse` / `Visual C++ 14.0 required` (Windows) | You're on Python 3.13+; no prebuilt `lzfse` wheel. Recreate the venv with 3.12: `py -3.12 -m venv .venv` (or install the C++ Build Tools) |
 | `pip` not recognized in venv (Windows) | Conda-base venvs omit the `pip.exe` wrapper — call it as a module: `.\.venv\Scripts\python -m pip ...` |
+| `No module named 'pydantic_core._pydantic_core'` (backend) | Split-brain venv — its interpreter (e.g. recreated by Conda 3.13) no longer matches its installed binaries. Delete `backend\.venv` and re-run `dev.ps1`; it now rebuilds automatically with Python 3.12 |
+| Electron window never opens / stays blank | The renderer must be reachable at `http://127.0.0.1:5173`. `vite.config.ts` binds to `127.0.0.1`; if you changed it to `localhost`, Windows may bind IPv6-only and `wait-on`/Electron (IPv4) time out |
 | `InvalidServiceError` | DDI not mounted: `pymobiledevice3 mounter auto-mount` |
 | Map blank | Check renderer console for tile errors. Confirm internet reachable. |
 | Blue dot doesn't move on phone | Open Apple Maps once after teleport — CoreLocation publishes on first read |

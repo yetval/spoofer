@@ -16,30 +16,49 @@ if ($stale) {
   Start-Sleep -Seconds 1
 }
 
-# 1. backend venv (needed for pymobiledevice3 binary path)
-# Prefer Python 3.12: the `lzfse` dependency only ships prebuilt Windows wheels up to CPython 3.12,
-# so 3.13+ would try to compile it and need a C++ toolchain. Fall back to default `python`.
-if (-not (Test-Path $venv)) {
-  Write-Host "Creating venv..."
-  $created = $false
+# 1. backend venv (self-healing)
+# Prefer a python.org Python 3.12: `lzfse` (a pymobiledevice3 dep) only ships prebuilt Windows
+# wheels up to CPython 3.12. We also rebuild the venv if its native modules don't import — e.g.
+# when a Conda interpreter re-stamped it to 3.13 over 3.12-built packages (split-brain venv).
+$venvPy = Join-Path $venv "Scripts\python.exe"
+
+function Resolve-BasePython {
+  # python.org 3.12, then 3.11, then whatever `python` resolves to (warns about 3.13+).
   if (Get-Command py -ErrorAction SilentlyContinue) {
     foreach ($v in @("3.12", "3.11")) {
-      & py "-$v" -m venv $venv 2>$null
-      if ($LASTEXITCODE -eq 0) { Write-Host "  using Python $v"; $created = $true; break }
+      $exe = & py "-$v" -c "import sys; print(sys.executable)" 2>$null
+      if ($LASTEXITCODE -eq 0 -and $exe) { return $exe.Trim() }
     }
   }
-  if (-not $created) {
-    Write-Host "  Python 3.12 not found via the py launcher; using default python (3.13+ may need C++ Build Tools)."
-    python -m venv $venv
-  }
-  # Call pip as a module — conda-base venvs omit the pip.exe wrapper.
-  & (Join-Path $venv "Scripts\python.exe") -m pip install -r (Join-Path $root "backend\requirements.txt")
+  Write-Host "  WARNING: Python 3.12 not found. Using default python; 3.13+ needs prebuilt lzfse"
+  Write-Host "           wheels (currently <=3.12) or C++ Build Tools. winget install Python.Python.3.12"
+  $exe = & python -c "import sys; print(sys.executable)" 2>$null
+  if ($LASTEXITCODE -eq 0 -and $exe) { return $exe.Trim() }
+  return $null
 }
-$venvPy = Join-Path $venv "Scripts\python.exe"
-& $venvPy -c "import pymobiledevice3" 2>$null
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "pymobiledevice3 missing in venv. Reinstall: $venvPy -m pip install -r $root\backend\requirements.txt"
-  exit 1
+
+# Healthy = the native deps actually import under the venv interpreter.
+$venvHealthy = $false
+if (Test-Path $venvPy) {
+  & $venvPy -c "import pydantic_core, pymobiledevice3" 2>$null
+  if ($LASTEXITCODE -eq 0) { $venvHealthy = $true }
+  else { Write-Host "Existing venv is broken (interpreter/package mismatch) - rebuilding..." }
+}
+
+if (-not $venvHealthy) {
+  if (Test-Path $venv) { Remove-Item -Recurse -Force $venv }
+  $base = Resolve-BasePython
+  if (-not $base) { Write-Error "No usable Python found. Install Python 3.12: winget install Python.Python.3.12"; exit 1 }
+  Write-Host "Creating venv with $base"
+  & $base -m venv $venv
+  # Call pip as a module — some base interpreters omit the pip.exe wrapper.
+  & $venvPy -m pip install --upgrade pip
+  & $venvPy -m pip install -r (Join-Path $root "backend\requirements.txt")
+  & $venvPy -c "import pydantic_core, pymobiledevice3" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Backend deps failed to import after install. See the lzfse / Build Tools note in the README."
+    exit 1
+  }
 }
 
 # 2. tunneld (UAC elevation, pass nothing - the script self-locates the binary)
