@@ -18,6 +18,36 @@ Plug it into the computer. Tap **Trust** when prompted.
 
 ### 2. Toolchain
 
+**Windows — one command** (PowerShell)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+```
+
+That installs everything that's missing (Python 3.12, Node.js, and the **Apple Mobile Device
+USB driver** via iTunes), builds the backend virtualenv, runs `npm install`, and finishes by
+running the doctor (below) to confirm you're ready. Re-running it is safe — it skips whatever
+is already in place.
+
+Want to know what's wrong before/after, without guessing? Run the preflight check any time:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+```
+
+It prints `OK` / `WARN` / `FAIL` for each prerequisite (Python 3.12, Node, Apple driver, venv
+health, app deps, and whether your iPhone is actually detected) with the exact fix for each.
+
+<details>
+<summary>Windows — manual steps (if you'd rather not run the script)</summary>
+
+```powershell
+winget install Apple.iTunes Python.Python.3.12 OpenJS.NodeJS
+cd spoofer\backend; py -3.12 -m venv .venv; .\.venv\Scripts\python -m pip install -r requirements.txt
+cd ..\app;          npm install
+```
+</details>
+
 **macOS**
 
 ```bash
@@ -26,13 +56,13 @@ cd spoofer/backend && python3 -m venv .venv && ./.venv/bin/pip install -r requir
 cd ../app          && npm install
 ```
 
-**Windows** (PowerShell)
+(macOS talks to the iPhone through the `usbmuxd` that ships with the OS — no iTunes/driver install needed.)
 
-```powershell
-winget install Python.Python.3.12 OpenJS.NodeJS
-cd spoofer\backend; py -3.12 -m venv .venv; .\.venv\Scripts\python -m pip install -r requirements.txt
-cd ..\app;          npm install
-```
+> **Apple Mobile Device USB driver (Windows only — required).** `pymobiledevice3` cannot see your
+> iPhone over USB unless Windows has Apple's Mobile Device USB driver installed. It ships with
+> **iTunes** (`winget install Apple.iTunes`, which `setup.ps1` does for you). Without it the device
+> simply never appears and every status pill stays red. A reboot is occasionally needed after install
+> before Windows loads the driver.
 
 > **Use Python 3.12, not 3.13+.** `pymobiledevice3` pulls in `lzfse`, a C-extension whose prebuilt
 > Windows wheels currently stop at CPython 3.12. On 3.13+ pip falls back to compiling it from source
@@ -89,8 +119,11 @@ Big red **Reset to real** button in the top-right. Also clears automatically if 
 
 ## Troubleshooting
 
+**Stuck? Run `scripts\doctor.ps1` first** — it checks every prerequisite below and tells you which one is missing.
+
 | Symptom | Fix |
 |---|---|
+| Device never appears, all pills red (Windows) | Apple Mobile Device USB driver missing — `winget install Apple.iTunes` (or `scripts\setup.ps1`), then replug. Reboot if it still doesn't show. |
 | `tunnel` pill stays red | Start it manually in an **admin** shell: `pymobiledevice3 remote tunneld` (macOS: prefix with `sudo`) |
 | UAC prompt dismissed (Windows) | Re-run and click **Yes** — `tunneld` cannot start without elevation |
 | `No tunneld device` | Trust dialog dismissed on phone — unlock and replug |
